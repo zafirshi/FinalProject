@@ -39,8 +39,8 @@ def aug_grad(input_x, lamb, mu):
     # update
     tmp = A @ input_x - b
     c_x = np.where(tmp > 0, 0, -tmp)
-    lamb_new = np.where(c_x>0, lamb, 0)
-    return grad_obj_function(G, c, input_x) - A.T @ lamb_new -  mu * A.T @ c_x
+    lamb_new = np.where(c_x > 0, lamb, 0)
+    return grad_obj_function(G, c, input_x) - A.T @ lamb_new - mu * A.T @ c_x
     # return grad_obj_function(G, c, input_x) - A.T @ lamb + mu * (A.T @ A @ input_x - A.T @ b)
 
 
@@ -64,7 +64,7 @@ def find_sub_solution(init_x, lamb, mu, omega):
     x = init_x
     max_iter = 1_000_000
     H = np.eye(len(x))
-    # thd = 1e-5
+
     for i in range(max_iter):
         g_k = aug_grad(x, lamb, mu)
 
@@ -77,8 +77,7 @@ def find_sub_solution(init_x, lamb, mu, omega):
             s = alpha * p
             x_new = x + alpha * p
             y = aug_grad(x_new, lamb, mu) - aug_grad(x, lamb, mu)
-            # deal with divide zero
-            # if (y.T @ s) < 1e-15: return x,i
+
             r = 1 / (y.T @ s)
             li = (np.eye(len(x)) - (r * (s @ y.T)))
             ri = (np.eye(len(x)) - (r * (y @ s.T)))
@@ -88,14 +87,12 @@ def find_sub_solution(init_x, lamb, mu, omega):
             x = x_new
             # print(f'{i}:{x.T}  f(x):{obj_function(G, c, x)} mu :{mu} lamb :{lamb.T}')
 
-    print("算法终止，增广函数的局部最优解在迭代次数中未找到")
+    print(f"\n!Terminate! Local optimal solution of the augmented function is  not found in {max_iter} iterations")
     return x, max_iter
 
 
-def aug_lag(penalty_type, **kwargs):
-    init_x = np.array([[0.1, 0.5]]).transpose()
-
-    x = init_x
+def aug_lag(input_x):
+    x = input_x
 
     lamb = 1 * np.ones_like(b)
     eta_thd = 1e-5
@@ -112,34 +109,29 @@ def aug_lag(penalty_type, **kwargs):
     for i in range(max_iter):
         print(f'-----------------{i}-----------------')
         x_sub, iter_num = find_sub_solution(x, lamb, mu, omega)
-        print(
-            f'==========================>aug_grad(x_sub, lamb, mu,):{np.linalg.norm(aug_grad(x_sub, lamb, mu), ord=1)}')
+
         c_xk = A @ x_sub - b
-        c_ = np.where(c_xk>0, 0, -c_xk)
+        c_ = np.where(c_xk > 0, 0, -c_xk)
         if np.linalg.norm(c_, ord=1) <= eta:
-            # 测试收敛性条件
+            # Test convergence conditions
             if np.linalg.norm(c_, ord=1) <= eta_thd and \
                     np.linalg.norm(aug_grad(x_sub, lamb, mu, ), ord=1) <= omega_thd:
-                print(f'Get x*:{x_sub} in iter_num{iter_num}')
+                print(f'\n======> iter_num {iter_num} \n======> Get correct x*: {x_sub.T}  f(x):{obj_function(G,c,x_sub)}')
                 return x_sub
-            # 更新乘子，缩小容忍误差
+            # Update multiplier to reduce tolerance error
             lamb = lamb - mu * (A @ x_sub - b)
             mu = mu
             eta = eta * mu ** (-0.9)
             omega = omega * mu ** (-1)
-            print(f'---------==>1 lamb: {lamb.T}  mu:{mu}  eta;{eta}  omega: {omega}')
         else:
-            # 增加惩罚函数，缩小容忍误差
+            # Increase penalty function and reduce tolerance error
             lamb = lamb
             mu = 100 * mu
             eta = mu ** (-0.1)
             omega = mu ** (-1)
-
-            print(f'----------==> lamb: {lamb.T}  mu:{mu}  eta;{eta}  omega: {omega}')
-        print(f'============================>c(x)范数: {np.linalg.norm((A @ x_sub - b), ord=1)}')
-        print(f'============================>梯度范数: { np.linalg.norm(aug_grad(x_sub, lamb, mu, ), ord=1)}')
+        print(f'======> iter_num {iter_num} \n======> x: {x_sub.T}  f(x):{obj_function(G, c, x_sub)}')
         x = x_sub
-    print(f'程序在主进程执行完毕后并未找到最优解')
+    print(f'\n========> The program did not find the optimal solution after {max_iter} iteration')
 
 
 if __name__ == '__main__':
@@ -160,4 +152,5 @@ if __name__ == '__main__':
         'A': A,
         'b': b
     }
-    solution3 = aug_lag('lagrangian', **func_dic)
+    init_x = np.array([[1/4, 1/3]]).transpose()
+    solution3 = aug_lag(init_x)

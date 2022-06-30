@@ -61,7 +61,7 @@ def aug_grad_obj_function(x, mu, penalty_type, **kwargs):
         raise NotImplementedError('aug_grad_obj_function: penalty_type is not implemented')
 
 
-def find_alpha(x, mu, p, penalty_type, alpha_thd=1e-2):
+def find_alpha(x, mu, p, penalty_type, alpha_thd=1e-5):
     c1 = 1e-5
     c2 = 0.9
     alpha = 1
@@ -79,14 +79,13 @@ def find_alpha(x, mu, p, penalty_type, alpha_thd=1e-2):
     return alpha
 
 
-def GD(func, init, thd, mu, penalty_type, **kwargs):
+def GD(init, thd, mu, penalty_type, **kwargs):
     x = init
     max_iter = 1_000_000
 
     H = np.eye(len(x))
 
     for i in range(max_iter):
-        # Todo: 完成增广目标函数求梯度
         g_k = aug_grad_obj_function(x, mu, penalty_type)
         if np.linalg.norm(g_k, ord=1) < thd:
             return x, i
@@ -97,9 +96,9 @@ def GD(func, init, thd, mu, penalty_type, **kwargs):
 
             x_new = x + alpha * p_k
             x = x_new
-            print(f'{i}:{x.T}  f(x):{obj_function(G, c, x)}')
+            # print(f'{i}:{x.T}  f(x):{obj_function(G, c, x)}')
 
-    print("算法终止，增广函数的局部最优解在迭代次数中未找到")
+    print(f"Terminate without finding aug_function solution in {max_iter} iterations")
     return x, max_iter
 
 
@@ -129,9 +128,9 @@ def BFGS(aug, init_x, thd, mu, penalty_type, **kwargs):
             H = hess_inter + (r * (s @ s.T))  # BFGS Update
 
             x = x_new
-            print(f'{i}:{x.T}  f(x):{obj_function(G, c, x)} mu :{mu}')
+            # print(f'{i}:{x.T}  f(x):{obj_function(G, c, x)} mu :{mu}')
 
-    print("算法终止，增广函数的局部最优解在迭代次数中未找到")
+    print(f"=====> Failed! Terminate without finding solution in {max_iter} iterations")
     return x, max_iter
 
 
@@ -141,7 +140,7 @@ def newton():
 
 def get_approximate_solution(aug, mu, tau, init_x, penalty_type, method: str = 'newton'):
     if method.lower() == 'newton':
-        newton()
+        return newton()
     elif method.upper() == 'BFGS':
         return BFGS(aug, init_x, tau, mu, penalty_type)
     elif method.upper() == 'GD':
@@ -150,12 +149,12 @@ def get_approximate_solution(aug, mu, tau, init_x, penalty_type, method: str = '
         raise NotImplementedError("method is not Implemented")
 
 
-def penalty_method(penalty_type, **kwargs):
-    mu = 1  # 惩罚因子
-    tau = 1e-5  # 扩充目标函数阈值
-    thd = 0.001  # 收敛性检测阈值
+def penalty_method(input_x, penalty_type, method, **kwargs):
+    mu = 1  # penalty factor
+    tau = 1e-5  # Extended objective function threshold
+    thd = 0.001  # Convergence detection threshold
 
-    init_x = np.array([[0., 0.]]).transpose()
+    init_x = input_x
     assert init_x.shape[1] == 1  # check x whether be a column vector
 
     max_iter = 100
@@ -167,18 +166,26 @@ def penalty_method(penalty_type, **kwargs):
         # find approximate solution of penalty function
 
         print(f'_________________________________________{epoch}_________________________________________')
-        x, iter_num = get_approximate_solution(aug_obj_function, mu, tau, init_x, penalty_type, method='BFGS')
+        x, iter_num = get_approximate_solution(aug_obj_function, mu, tau, init_x, penalty_type, method=method)
         print(f'iter num: {iter_num}, x: {x.T}, f(x): {obj_function(G, c, x)}')
-        # 收敛性测试 -> 简单认为是目标函数数值没有很大变化
+        # Convergence test - > simply consider that the value of the objective function has not changed greatly
         object_function_last = obj_function(G, c, init_x)
         object_function_this = obj_function(G, c, x)
 
-        aug_last = aug_obj_function(init_x, mu, penalty_type, **kwargs)
-        aug_this = aug_obj_function(x, mu, penalty_type, **kwargs)
+        if penalty_type.lower() == 'quadratic':
+            if np.abs(object_function_last - object_function_this) < thd:
+                print('\n===========================Find correct answer!===========================')
+                print(f'======> epoch_num {epoch} correct x*: {x.T}  f(x):{object_function_this}')
+                return x
 
-        if np.abs(object_function_last - object_function_this) < thd:
-            print(f'x*:{x.T}----f(x):{object_function_this}')
-            return x
+        # If the constraint condition is less than the threshold after the []- operation, the loop is terminated
+        elif penalty_type.lower() == 'classic':
+            tmp = A @ x - b
+            c_x = np.where(tmp > 0, 0, -tmp)
+
+            if np.sum(c_x.squeeze(-1)) < thd:
+                print(f'x*:{x.T}----f(x):{object_function_this}')
+                return x
         mu = mu * 5
         init_x = x
 
@@ -203,6 +210,7 @@ if __name__ == '__main__':
         'A': A,
         'b': b
     }
-    # solution1 = penalty_method('quadratic', **func_dic)
-    solution2 = penalty_method('classic', **func_dic)
-    # solution3 = penalty_method('lagrangian', **func_dic)
+    input_x = np.array([[1., 1 / 2]]).transpose()
+    # todo: For the second question, release solution2
+    solution1 = penalty_method(input_x, penalty_type='quadratic', method='GD', **func_dic)
+    # solution2 = penalty_method('classic', **func_dic)
