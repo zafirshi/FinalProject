@@ -79,7 +79,7 @@ def find_alpha(x, mu, p, penalty_type, alpha_thd=1e-5):
     return alpha
 
 
-def GD(init, thd, mu, penalty_type, **kwargs):
+def GD(aug, init, thd, mu, penalty_type, **kwargs):
     x = init
     max_iter = 1_000_000
 
