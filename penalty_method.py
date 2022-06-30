@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 
 
@@ -212,5 +214,8 @@ if __name__ == '__main__':
     }
     input_x = np.array([[1., 1 / 2]]).transpose()
     # todo: For the second question, release solution2
+    start = time.time()
     solution1 = penalty_method(input_x, penalty_type='quadratic', method='GD', **func_dic)
+    end = time.time()
+    print(f'======> Calculate Time: {end-start}s')
     # solution2 = penalty_method('classic', **func_dic)
